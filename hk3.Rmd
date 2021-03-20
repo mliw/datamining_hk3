@@ -1,5 +1,5 @@
 ---
-title: "ECO395M STAT LEARNING Homework 2" 
+title: "ECO395M STAT LEARNING Homework 3" 
 author: "Mingwei Li, Xinyu Leng, Hongjin Long"
 thanks: "Mingwei Li, Xinyu Leng and Hongjin Long are master students of economics, The University of Texas at Austin"
 output:
@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 \begin{abstract}
-This document is the second homework of ECO395M STAT LEARNING. 
+This document is the third homework of ECO395M STAT LEARNING. 
 \begin{figure}[!htbp]
 	\centering
 	\includegraphics[width=0.85\textwidth]{pics/0.jpg}
@@ -23,580 +23,99 @@ This document is the second homework of ECO395M STAT LEARNING.
 \tableofcontents
 
 \newpage
-\section{Problem 1: visualization}
-```{r,echo=FALSE,message=FALSE}
-# Load the data and package
-library(ggplot2)
-library(tidyverse)
-capmetro = read.csv("data/capmetro_UT.csv")
-```
-```{r,echo=FALSE,message=FALSE}
-# Extract the month and year
-tem = capmetro$timestamp[1]
-month_func = function(my_str){
-  return(as.numeric(strsplit(my_str, "-", fixed=TRUE)[[1]][2]))
-}
-hour_func = function(my_str){
-detailed_time = strsplit(my_str, " ", fixed=TRUE)[[1]][2]
-hour = as.numeric(strsplit(detailed_time, ":", fixed=TRUE)[[1]][1])
-return(hour)
-}
-capmetro$month = apply(array(capmetro$timestamp),1,month_func)
-capmetro$hour = apply(array(capmetro$timestamp),1,hour_func)
-```
-```{r,echo=FALSE,message=FALSE}
-# Select data from certain periods
-logi = capmetro$month>=9 &  capmetro$month<=11
-data = capmetro[logi,]
-```
+\section{What causes what?}
 
-We first load capmetro_UT.csv and calculate average boardings grouped by
-hour,day_of_week and month.
-```{r,echo=FALSE,message=FALSE}
-# Calculate average boardings
-data_summary = data %>%
-  group_by(hour,day_of_week,month) %>%
-  summarize(mean_boarding=mean(boarding))
-print(data_summary[1:5,])
-```
+\textbf{(Q1\_1) Why can’t I just get data from a few different cities and run the regression of “Crime” on “Police” to understand how more cops in the streets affect crime? (“Crime” refers to some measure of crime rate and “Police” measures the number of cops in a city.)}
 
-\newpage
-\subsection{line graphs}
-\textbf{(Q1\_1\_1) One panel of line graphs that plots average boardings grouped by hour of the day, day of week, and month. You should facet by day of week. Each facet should include three lines, one for each month, colored differently and with colors labeled with a legend. Give the figure an informative caption in which you explain what is shown in the figure}
+What we want to know is the causal effect of police on crime rate. This is of great policy significance.
 
-Caption: Average boardings grouped by hour of the day, day of week, and month. The graph is facet by day of week. The three lines in each facet stand for different months.
+It's possible that places with an inordinate amount of crime tend to employ a large police force.
+Which means crime rate is the causal effect of police.
 
-```{r fig1,echo=FALSE,message=FALSE,fig.width=5.5,fig.height=7,fig.align = "center"}
-data_summary$month = factor(data_summary$month)
-p0 = ggplot(data=data_summary,aes(x=hour,y=mean_boarding,group=month,color=month))+ geom_line()+facet_wrap(~day_of_week, nrow=4)+ggtitle("Mean Boarding in different time intervals")+theme(plot.title = element_text(hjust = 0.5))
-p0
-```
-
-\newpage
-\textbf{(Q1\_1\_2) Does the hour of peak boardings change from day to day, or is it broadly similar across days?}
-
-Based on the figure, It is broadly similar across days. At about hour 15 or 16.
+The result of such regression can not credibly identify a causal effect of police on crime.
 
 \vspace{12pt}
-\textbf{(Q1\_1\_3) Why do you think average boardings on Mondays in September look lower, compared to other days and months?}
+\textbf{(Q1\_2) How were the researchers from UPenn able to isolate this effect? Briefly describe their approach and discuss their result in the “Table 2” below, from the researchers' paper.}
 
-September is the beginning of Fall semester, which means there is less people on campus. On Monday, perhaps there is less courses than other days.
+\textbf{How were the researchers from UPenn able to isolate this effect? Briefly describe their approach}
+
+They use the easily identifiable and clearly exogenous shock provided by changes in the terror alert level in Washington, D.C., to evaluate the causal effect of police on crime. A notable benefit of their research design is that their treatment, the terror alert level, turns on and off repeatedly during their sample.
+
+The logi is: changes in the terror alert level $\Rightarrow$ changes in the number of police $\Rightarrow$ changes in different types of crimes. Therefore, they can estimate the causal effect of police on crime.
+
+\textbf{and discuss their result in the “Table 2” below, from the researchers' paper.}
+
+The table 2 is listed below. We would discuss the entry in the table one by one.
+\begin{figure}[!htbp]
+	\centering
+	\includegraphics[width=0.5\textwidth]{pics/q1_2.jpg}
+\end{figure}
+
+(row1 column1 -7.316):
+The results from their most basic regression are presented in Table 2, where
+they regress daily D.C. crime totals against the terror alert level (1  high,
+0 elevated) and a day-of-the-week indicator. The coefficient on the alert
+level is statistically significant at the 5 percent level and indicates that on
+high-alert days, total crimes decrease by an average of seven crimes per day,
+or approximately 6.6 percent
+
+(column2 -6.046 17.341):
+To investigate the effect of tourism more systematically, in column 2 of
+Table 2 they verify that high-alert levels are not being confounded with tourism
+levels by including logged midday Metro ridership directly in the regression.
+The coefficient on the alert level is slightly smaller, at -6.2 crimes per day.
+Interestingly, they find that increased Metro ridership is correlated with an
+increase in crime. The increase, however, is very small—a 10 percent increase
+in Metro ridership increases the number of crimes by only 1.7 per day on
+average. Thus, given that midday Metro ridership is a good proxy for tourism,
+changes in the number of tourists cannot explain the systematic change in
+crime that they estimate.
+
+\newpage
+\textbf{(Q1\_3) Why did they have to control for Metro ridership? What was that trying to capture?}
+
+\textbf{Why did they have to control for Metro ridership?}
+
+What has been confirmed from basic regression is high alert level $\Rightarrow$ less crime.
+
+There are 2 hypotheses:(1) high alert level $\Rightarrow$ high police level $\Rightarrow$ less crime.
+(2) high alert level $\Rightarrow$ less tourism $\Rightarrow$ less crime. They want to rule out the second
+hypothesis, therefore they have to control for Metro ridership.
+
+\textbf{What was that trying to capture?}
+
+They are trying to capture the causal effect of tourism on crime.
 
 \vspace{12pt}
-\textbf{(Q1\_1\_4) Similarly, why do you think average boardings on Weds/Thurs/Fri in November look lower?}
-
-There are many midterm exams in November, which means students stay in the dorm to study for the exams without having to go outside.
-
-\newpage
-\subsection{scatter plots}
-```{r,echo=FALSE,message=FALSE}
-#We first desigin indicator for weekdays/weekend.
-# is_weekend 1 if it's a weekend
-data$is_weekend = as.numeric(data$weekend=="weekend")
-transform_func = function(num){
-  if (num==1){
-    return("weekend")
-  }
-  else{
-    return("weekday")
-  }
-}
-data$is_weekend_indicator = apply(array(data$is_weekend),1,transform_func)
-```
-\textbf{(Q1\_2\_1) One panel of scatter plots showing boardings (y) vs. temperature (x) in each 15-minute window, faceted by hour of the day, and with points colored in according to whether it is a weekday or weekend. Give the figure an informative caption in which you explain what is shown in the figure.}
-
-Caption: Scatter plots showing boardings (y) vs. temperature (x) in each 15-minute window, faceted by hour of the day. Points are colored in according to whether it is a weekday or weekend.
-
-```{r fig2,echo=FALSE,message=FALSE,fig.width=7.5,fig.height=8,fig.align = "center"}
-p0 = ggplot(data=data,aes(x=temperature,y=boarding,color=is_weekend_indicator))+
-geom_point(alpha=0.3)+facet_wrap(~hour, nrow=4)+
-ggtitle("The Relationship between Boarding and Temperature in different Hours")+
-theme(plot.title = element_text(hjust = 0.5))
-p0
-```
-
-\newpage
-\textbf{(Q1\_2\_2) When we hold hour of day and weekend status constant, does temperature seem to have a noticeable effect on the number of UT students riding the bus?}
-
-Just from the plot above, temperature doesn't have a noticeable effect on the number of UT students riding the bus.
-
-
-\newpage
-\section{Problem 2: Saratoga house prices}
-\subsection{The Best Linear Model}
-
-\textbf{(Q2\_1) Build the best linear model for price that you can. It should clearly outperform the "medium" model that we considered in class. Use any combination of transformations, engineering features, polynomial terms, and interactions that you want; and use any strategy for selecting the model that you want.}
-
-```{r,echo=FALSE,message=FALSE}
-#We first load data.
-library(tidyverse)
-library(ggplot2)
-library(rsample)
-library(mosaic)
-library(ModelMetrics)
-data(SaratogaHouses)
-# Metric definition(Use a number to evaluate the performance of a certain model),rmse is adopted.
-library(caret)
-evaluate_func = function(my_str,data){
-  set.seed(100)
-  indexs = createFolds(1:dim(data)[1], k = 5, list = TRUE, returnTrain = FALSE)
-  err_result = c()
-  for (i in 1:5){
-    test_data = data[indexs[[i]],]
-    train_data = data[-indexs[[i]],]
-    lm_model = lm(as.formula(my_str), data=train_data)
-    err = rmse(lm_model, test_data)
-    err_result = c(err_result,err)
-  }
-  return(mean(err_result))
-}
-
-middle_str = "price ~ lotSize + age + livingArea + bedrooms +
-fireplaces + bathrooms + rooms + heating + fuel + centralAir"
-#print(evaluate_func(middle_str,SaratogaHouses))
-```
-The average of 5-fold corss-validation Rmse is used to evaluate a certain model. The cross-validation Rmse of middle model is 65989.29. Our target is very simple, to find a model with cross-validation rmse lower than 65989.29. A greedy algorithm is used for feature selection, and the result is as follows.
-```{r,echo=FALSE,message=FALSE}
-# x_names = colnames(SaratogaHouses)[2:length(colnames(SaratogaHouses))]
-# y_name = "price"
-# count = 0
-# rmse_record = Inf
-# best_name = ""
-# best_test_str = ""
-# best_record_previous = Inf
-# result_collect = c()
-#
-# while(TRUE){
-#   for (name in x_names){
-#     if (count == 0){
-#      test_str = paste(y_name,"~",name,sep="")
-#     }
-#     else{
-#      test_str = paste(y_name,"+",name,sep="")
-#     }
-#     err = evaluate_func(test_str,SaratogaHouses)
-#     if (err<rmse_record){
-#       rmse_record = err
-#       best_name = name
-#       best_test_str = test_str
-#     }
-#   }
-#   if (rmse_record<best_record_previous){
-#     best_record_previous = rmse_record
-#   }
-#   else{
-#     break
-#   }
-#   y_name = best_test_str
-#   result_collect = c(result_collect,c(y_name,rmse_record))
-#   count = count + 1
-#   x_names = setdiff(x_names,best_name)
-#   if (length(x_names)==0){
-#     break
-#   }
-# }
-# print(result_collect)
-```
-```{r,echo=FALSE,message=FALSE}
-best_str = "price~livingArea+landValue+bathrooms+waterfront+newConstruction+
-heating+lotSize+centralAir+age+rooms+bedrooms+fuel+pctCollege+sewer+fireplaces"
-```
-
-The best variables are(with cross-validation error of 57828.05):
-```{r,echo=TRUE,message=FALSE}
-# "price~livingArea+landValue+bathrooms+waterfront+newConstruction+
-# heating+lotSize+centralAir+age+rooms+bedrooms+fuel+pctCollege+sewer+fireplaces"
-# Error:57828.05
-```
-
-Corresponding cross-validation error is 57828.05, lower than 65989.29 from the medium model. The summary is as follows.
-```{r,echo=FALSE,message=FALSE}
-lm_model = lm(as.formula(best_str), data=SaratogaHouses)
-summary(lm_model)
-```
-In all, we successfully overperform the medium model!
-
-\newpage
-\subsection{The Best KNN}
-
-\textbf{(Q2\_2) Now build the best K-nearest-neighbor regression model for price that you can. Note: you still need to choose which features should go into a KNN model, but you don't explicitly include interactions or polynomial terms. The method is sufficiently adaptable to find interactions and nonlinearities, if they are there. But do make sure to standardize your variables before applying KNN, or at least do something that accounts for the large differences in scale across the different variables here.}
-
-```{r,echo=FALSE,message=FALSE}
-library(kknn)
-knn_evaluate_func = function(my_str,data){
-  set.seed(100)
-  indexs = createFolds(1:dim(data)[1], k = 5, list = TRUE, returnTrain = FALSE)
-  err_result = c()
-  for (i in 1:5){
-    test_data = data[indexs[[i]],]
-    train_data = data[-indexs[[i]],]
-    model = train.kknn(as.formula(my_str),train_data,scale = TRUE)
-    test_prediction = predict(model,test_data)
-    test_actual = test_data$price
-    err = rmse(actual=test_actual, predicted=test_prediction)
-    err_result = c(err_result,err)
-  }
-  return(mean(err_result))
-}
-```
-
-```{r,echo=FALSE,message=FALSE}
-# x_names = colnames(SaratogaHouses)[2:length(colnames(SaratogaHouses))]
-# y_name = "price"
-# count = 0
-# rmse_record = Inf
-# best_name = ""
-# best_test_str = ""
-# best_record_previous = Inf
-# result_collect = c()
-#
-# while(TRUE){
-#   for (name in x_names){
-#     if (count == 0){
-#      test_str = paste(y_name,"~",name,sep="")
-#     }
-#     else{
-#      test_str = paste(y_name,"+",name,sep="")
-#     }
-#     err = knn_evaluate_func(test_str,SaratogaHouses)
-#     if (err<rmse_record){
-#       rmse_record = err
-#       best_name = name
-#       best_test_str = test_str
-#     }
-#   }
-#   if (rmse_record<best_record_previous){
-#     best_record_previous = rmse_record
-#   }
-#   else{
-#     break
-#   }
-#   y_name = best_test_str
-#   result_collect = c(result_collect,c(y_name,rmse_record))
-#   count = count + 1
-#   x_names = setdiff(x_names,best_name)
-#   if (length(x_names)==0){
-#     break
-#   }
-# }
-# print(result_collect)
-best_str = "price~livingArea+landValue+age+pctCollege+waterfront+newConstruction"
-```
-Package kknn is used, and we slightly modify the evaluation function. Greedy algorithm is adopted again to select the best feature combination, the results are as follows. The best variables and cross-validation error for KNN is as follows
-```{r,echo=TRUE,message=FALSE}
-# "price~livingArea+landValue+age+pctCollege+waterfront+newConstruction"
-# 58061.7316651973
-```
-The summary of KNN is:
-```{r,echo=FALSE,message=FALSE}
-model = train.kknn(as.formula(best_str),SaratogaHouses,scale = TRUE)
-summary(model)
-```
-
-
-\newpage
-\subsection{Analysis}
-
-\textbf{(Q2\_3) Which model seems to do better at achieving lower out-of-sample mean-squared error? Write a report on your findings as if you were describing your price-modeling strategies for a local taxing authority, who needs to form predicted market values for properties in order to know how much to tax them. Keep the main focus on the conclusions and model performance; any relevant technical details should be put in an appendix.}
-
-The best variables and cross-validation error for KNN is
-```{r,echo=TRUE,message=FALSE}
-# "price~livingArea+landValue+age+pctCollege+waterfront+newConstruction"
-# 58061.7316651973
-```
-
-The best variables and cross-validation error for linear model is
-```{r,echo=TRUE,message=FALSE}
-# "price~livingArea+landValue+bathrooms+waterfront+newConstruction+heating+
-# lotSize+centralAir+age+rooms+bedrooms+fuel+pctCollege+sewer+fireplaces"
-# 57828.05
-```
-
-Although the cross-validation error is lower for linear model, I still believe knn
-is better, as it uses only 6 variables to achieve its lowest error.
-
-Moreover,$\frac{58061.7-57828.05}{57828.05}=0.00404$, not very much.
-
-\newpage
-\section{Problem 3: Classification and retrospective sampling}
-
-There are 300 Default and 700 not Default in the data.
-
-As for history, good: 89 poor:618 terrible: 293.
-
-```{r,echo=FALSE,message=FALSE,warning=FALSE}
-library(vcd)
-library(ggplot2)
-library(tidyverse)
-german_credit <- read.csv("data/german_credit.csv",stringsAsFactors=TRUE)
-# Default：300 Not Default: 700
-counts <- table(german_credit$history)
-# good: 89 poor:618 terrible: 293
-```
-
-\textbf{(Q3\_1) Make a bar plot of default probability by credit history}
-
-```{r fig 4,echo=FALSE,message=FALSE,fig.width=4,fig.height=4,fig.align = "center"}
-data_summary = german_credit %>%
-  group_by(history) %>%
-  summarize(mean_default=mean(Default))
-p0 = ggplot(data_summary,aes(x=history,y=mean_default))+geom_col()
-p0
-```
-
-\newpage
-\textbf{(Q3\_2) Build a logistic regression model for predicting default probability, using the variables duration + amount + installment + age + history + purpose + foreign.}
-
-The summary of model is as follows.
-
-```{r,echo=FALSE,message=FALSE}
-model <- glm( Default ~ duration + amount + installment + age + history + purpose + foreign, family = binomial(), data=german_credit)
-summary(model)
-```
-
-\newpage
-\textbf{(Q3\_3) What do you notice about the history variable vis-a-vis predicting defaults? What do you think is going on here? In light of what you see here, do you think this data set is appropriate for building a predictive model of defaults, if the purpose of the model is to screen prospective borrowers to classify them into "high" versus "low" probability of default? Why or why not---and if not, would you recommend any changes to the bank's sampling scheme?}
-
-\vspace{12pt}
-\textbf{What do you notice about the history variable vis-a-vis predicting defaults?}
-
-Based on the data, the default probability of people with good history is higher than the default probability of people with poor history. Not consistent with common sense! I don't think this variable work well in our model!(Although is significant)
-
-\textbf{What do you think is going on here?}
-
-There is a serious sampling problem. Due to "case-control" design, the default probability of people with good history is higher than other people. The sample can't reflect the real-world.
-
-\textbf{In light of what you see here, do you think this data set is appropriate for building a predictive model of defaults, if the purpose of the model is to screen prospective borrowers to classify them into "high" versus "low" probability of default?}
-
-This data set is NOT appropriate for building a predictive model of defaults. As the sample can't reflect the real-world.
-
-\textbf{Why or why not---and if not, would you recommend any changes to the bank's sampling scheme}
-
-I think the bank can just conduct random sampling of loans in the bank's overall portfolio. To solve unbalanced sample problem, the bank can change sample weight during modeling. Moreover, metrics like f1-score can be used to evaluate model performance.
-
-
-\newpage
-\section{Problem 4: Children and hotel reservations}
-```{r,echo=FALSE,message=FALSE,warning=FALSE}
-library(tidyverse)
-library(ggplot2)
-library(ModelMetrics)
-library(caret)
-library(lubridate)
-```
-
-\subsection{Model building}
-
-\textbf{(Q4\_1)Using only the data in hotels.dev.csv, please compare the out-of-sample performance of the following models:}
-
-```{r,echo=FALSE,message=FALSE,warning=FALSE}
-library(plotROC)
-hotelsdev = read.csv("data/hotels_dev.csv",stringsAsFactors=TRUE)
-```
-
-We first load the data. The mean f1-score from 5-fold cross-validation is applied to evaluate the performance of certain model.
-```{r,echo=FALSE,message=FALSE,warning=FALSE}
-evaluate_func = function(my_str,data){
-  set.seed(100)
-  indexs = createFolds(1:dim(data)[1], k = 5, list = TRUE, returnTrain = FALSE)
-  err_result = c()
-  for (i in 1:5){
-    test_data = data[indexs[[i]],]
-    train_data = data[-indexs[[i]],]
-    model = glm(as.formula(my_str), data=train_data,family = "binomial")
-    truth = test_data$children
-    prediction = predict(model,newdata = test_data,type = "response")
-    err_result = c(err_result,f1Score(truth,prediction))
-  }
-  return(mean(err_result))
-}
-```
-
-\textbf{1 Baseline model 1}
-```{r,echo=FALSE,message=FALSE,warning=FALSE}
-baseline_1_str = "children ~ market_segment + adults + customer_type + is_repeated_guest"
-model = glm(as.formula(baseline_1_str),data=hotelsdev,family = "binomial")
-prediction = predict(model,type = "response")
-truth = hotelsdev$children
-```
-The 5-fold cross-validation f1-score of Baseline 1:
-```{r,echo=FALSE,message=FALSE,warning=FALSE}
-print(evaluate_func(baseline_1_str,hotelsdev))
-```
-
-\vspace{12pt}
-\textbf{2 Baseline model 2}
-
-The 5-fold cross-validation f1-score of Baseline 2:
-```{r,echo=FALSE,message=FALSE,warning=FALSE}
-baseline_2_str = "children ~ (. - arrival_date)"
-model = glm(as.formula(baseline_2_str),data=hotelsdev,family = "binomial")
-prediction = predict(model,type = "response")
-truth = hotelsdev$children
-print(evaluate_func(baseline_2_str,hotelsdev))
-```
-
-\vspace{12pt}
-\textbf{3 Best linear model}
-
-We generate the time-stamp of year, month, day, and day of week from arrival_date.
-```{r,echo=FALSE,message=FALSE,warning=FALSE}
-hotelsdev = mutate(hotelsdev,
-                   arrival_date = ymd(arrival_date))
-hotelsdev = mutate(hotelsdev,
-                   wday = wday(arrival_date) %>% factor(),
-                   day = day(arrival_date) %>% factor(),
-                   month = month(arrival_date) %>% factor(),
-                   year = year(arrival_date))
-hotelsdev$arrival_date = as.character(hotelsdev$arrival_date)
-hotelsdev <- subset(hotelsdev, select = -c(arrival_date))
-```
-
-Then, we use greedy algorithm to find the best feature combination.
-```{r,echo=FALSE,message=FALSE,warning=FALSE}
-# x_names = colnames(hotelsdev)[-6]
-# y_name = "children"
-# count = 0
-# rmse_record = 0
-# best_name = ""
-# best_test_str = ""
-# best_record_previous = 0
-# result_collect = c()
-#
-# while(TRUE){
-#   for (name in x_names){
-#     if (count == 0){
-#       test_str = paste(y_name,"~",name,sep="")
-#     }
-#     else{
-#       test_str = paste(y_name,"+",name,sep="")
-#     }
-#     err = evaluate_func(test_str,hotelsdev)
-#     if (err>rmse_record){
-#       rmse_record = err
-#       best_name = name
-#       best_test_str = test_str
-#     }
-#   }
-#   if (rmse_record>best_record_previous){
-#     best_record_previous = rmse_record
-#   }
-#   else{
-#     break
-#   }
-#   y_name = best_test_str
-#   result_collect = c(result_collect,c(y_name,rmse_record))
-#   if (rmse_record>0.505){
-#     break
-#   }
-#   print(c(y_name,rmse_record))
-#   count = count + 1
-#   x_names = setdiff(x_names,best_name)
-#   if (length(x_names)==0){
-#     break
-#   }
-# }
-```
-
-The best feature combination is (cross-validation f1-score 0.50646)
-```{r,echo=FALSE,message=FALSE,warning=FALSE}
-print("children~reserved_room_type+hotel+previous_cancellations+booking_changes")
-```
-```{r,echo=FALSE,message=FALSE,warning=FALSE}
-best_str = "children~reserved_room_type+hotel+previous_cancellations+booking_changes"
-model = glm(as.formula(best_str),data=hotelsdev,family = "binomial")
-prediction = predict(model,type = "response")
-truth = hotelsdev$children
-```
-The 5-fold cross-validation f1-score of best model:
-```{r,echo=FALSE,message=FALSE,warning=FALSE}
-print(evaluate_func(best_str,hotelsdev))
-```
-
-\vspace{12pt}
-\textbf{4 Analysis}
-
-The cross-validation f1-scores of 3 models are as follows:
-
-Baseline1 model 1: 0
-
-Baseline1 model 2: 0.4642258
-
-Best model: 0.5064638
-
-The best model has the highest f1-score.
-
-\newpage
-\subsection{Model validation: step 1}
-
-\textbf{(Q4\_2)Produce an ROC curve for your best model, using the data in hotels\_val: that is, plot TPR(t) versus FPR(t) as you vary the classification threshold t.}
-
-We first fit on the hotelsdev data. Then we load hotels_val to conduct validation and draw ROC graph.
-```{r,echo=FALSE,message=FALSE,warning=FALSE}
-best_str = "children~reserved_room_type+hotel+previous_cancellations+booking_changes"
-model = glm(as.formula(best_str),data=hotelsdev,family = "binomial")
-```
-```{r,echo=FALSE,message=FALSE,warning=FALSE}
-# Then we load hotels_val to conduct validation and draw ROC graph.
-hotelsval = read.csv("data/hotels_val.csv")
-prediction = predict(model,newdata = hotelsval,type = "response")
-truth = hotelsval$children
-roc_data = cbind(truth,prediction)
-roc_data = data.frame(roc_data)
-basicplot <- ggplot(roc_data, aes(d = truth,m = prediction))+ geom_roc()
-```
-
-The plot is as follows:
-```{r fig21,echo=FALSE,message=FALSE,fig.width=3.5,fig.height=4,fig.align = "center"}
-advanced_plot = basicplot +
-  style_roc(theme = theme_grey) +
-  theme(axis.text = element_text(colour = "blue"),plot.title = element_text(hjust = 0.5))+
-  annotate("text", x = .75, y = .25,label = paste("AUC =", round(calc_auc(basicplot)$AUC, 2))) +
-  scale_x_continuous("FPR", breaks = seq(0, 1, by = .1))
-advanced_plot
-```
-
-\newpage
-\subsection{Model validation: step 2}
-
-\textbf{(Q4\_3)How well does your model do at predicting the total number of bookings with children in a group of 250 bookings? Summarize this performance across all 20 folds of the val set in an appropriate figure or table.}
-
-We first fit on the hotelsdev data. Then we load hotels_val to calculate prediction accuracy.
-```{r,echo=FALSE,message=FALSE,warning=FALSE}
-best_str = "children~reserved_room_type+hotel+previous_cancellations+booking_changes"
-model = glm(as.formula(best_str),data=hotelsdev,family = "binomial")
-# Then we load hotels_val to conduct validation and draw ROC graph.
-hotelsval = read.csv("data/hotels_val.csv")
-```
-The hotels_val is divided into 20 folds.
-```{r,echo=FALSE,message=FALSE,warning=FALSE}
-set.seed(100)
-indexs = createFolds(1:dim(hotelsval)[1], k = 20, list = TRUE, returnTrain = FALSE)
-err_result = c()
-for (i in 1:20){
-  slice_data = hotelsval[indexs[[i]],]
-  prediction = predict(model,newdata = slice_data,type = "response")
-  predict_num = mean(prediction)*dim(slice_data)[1]
-  ### expected number of bookings with children for that fold.
-  actual_num = sum(slice_data$children)
-  err_result = rbind(err_result,c(actual_num,predict_num))
-}
-```
-The following is the summary of expected number of bookings with children for that fold and actual number for that fold.
-```{r,echo=FALSE,message=FALSE,warning=FALSE}
-err_result = data.frame(err_result)
-colnames(err_result)=c("actual_num","predict_num")
-err_result$difference = err_result$predict_num-err_result$actual_num
-print(err_result)
-```
-
-The following figure demonstrates the distribution of difference beween actual number and expected number among 20 folds.
-```{r fig22,echo=FALSE,message=FALSE,fig.width=2.5,fig.height=3,fig.align = "center"}
-p0 = ggplot(data=err_result) +
-  geom_histogram(aes(x=difference))
-p0
-```
-
+\textbf{(Q1\_4) Below I am showing you "Table 4" from the researchers' paper. Just focus on the first column of the table. Can you describe the model being estimated here? What is the conclusion?}
+
+\begin{figure}[!htbp]
+	\centering
+	\includegraphics[width=0.7\textwidth]{pics/q1_4.jpg}
+\end{figure}
+
+\textbf{Can you describe the model being estimated here?}
+
+D.C has many districts. District 1 is the most important one, as White House is there. Therefore,
+the police would place a great amount of force in district 1 during high-alert period.
+
+The regression with district fixed effects is in Table 4. During periods of
+high alert, crime in the National Mall area(district 1) decreases by 2.62 crimes per day.
+Crime also decreases in the other districts, by .571 crimes per day, but this
+effect is not statistically significant.
+
+\textbf{What is the conclusion?}
+
+Police has a negative causal effect on crime, after controling other factors similar across the
+districts.
+
+We assume the police level in district 1 is much higher than other districts. In this case, the difference between the High Alert$\times$District One and the High Alert$\times$Other Districts coefficients is a differencein-difference estimator that controls for all common factors between the
+districts. If bad weather, for example, causes decreases in crime, a coincidental
+correlation with the timing of a high alert could confound their results. The
+difference-in-difference estimator controls for any factors such as weather,
+tourism, or other events that affect the districts similarly. Even after controlling for all such factors and recognizing that their assumption is too strong,
+they still find that crime decreases in District 1 during high-alert periods by
+some two crimes per day, or more than 12 percent.
 
 
 
