@@ -1,0 +1,11 @@
+\contentsline {section}{\numberline {1}What causes what?}{3}{section.1}%
+\contentsline {section}{\numberline {2}Predictive model building: green certification}{5}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Overview of the Problem}{5}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}Data and Modeling Approach}{6}{subsection.2.2}%
+\contentsline {subsubsection}{\numberline {2.2.1}Data}{6}{subsubsection.2.2.1}%
+\contentsline {subsubsection}{\numberline {2.2.2}Model}{7}{subsubsection.2.2.2}%
+\contentsline {subsection}{\numberline {2.3}Results of Data Analysis}{8}{subsection.2.3}%
+\contentsline {subsubsection}{\numberline {2.3.1}Feature Importance}{8}{subsubsection.2.3.1}%
+\contentsline {subsubsection}{\numberline {2.3.2}Best Features and Parameters}{9}{subsubsection.2.3.2}%
+\contentsline {subsubsection}{\numberline {2.3.3}Effect of Green Certification}{10}{subsubsection.2.3.3}%
+\contentsline {subsection}{\numberline {2.4}Conclusions}{11}{subsection.2.4}%

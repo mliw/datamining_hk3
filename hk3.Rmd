@@ -118,6 +118,296 @@ they still find that crime decreases in District 1 during high-alert periods by
 some two crimes per day, or more than 12 percent.
 
 
+\newpage
+\section{Predictive model building: green certification}
+
+\subsection{Overview of the Problem}
+
+With the increasing concentration on environmental protection, green certification for buildings become more and more important. The buildings with green certification are able to charge more rent as they can save energy cost and bring reputation to the tenant. However, the benefit of green certification needs to be quantified to provide more guidance for house owners. It's very difficult to extract the effect of green certification on revenue per square foot per calendar year, as there are many factors which can affect leasing rate and rent. 
+
+In this part, we (1) build a predictive model for revenue per square foot per calendar year based on 7894 commercial rental properties from across the United States, (2) and  use this model to quantify the average change in rental income per square foot associated with green certification, holding other features of the building constant. 
+
+$$
+rental\_income\_per\_square\_foot=leasing\_rate\times Rent
+$$
+
+\newpage
+\subsection{Data and Modeling Approach}
+
+\subsubsection{Data}
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+### Load the data
+library(ggplot2)
+library(xgboost)
+library(tidyverse)
+library(ModelMetrics)
+original_data = read.csv("data/greenbuildings.csv")
+original_data$revenue_per_square = (original_data$leasing_rate/100)*original_data$Rent
+# Your goal is to build the best predictive model possible for revenue per square 
+# foot per calendar year, and to use this model to quantify the average change in 
+# rental income per square foot (whether in absolute or percentage terms) associated 
+# with green certification, holding other features of the building constant. 
+# We have 2 goals
+# (1) build the best predictive model possible for revenue per square 
+# foot per calendar year
+
+# Remove features not nacessary
+# CS_PropertyID is just ID leasing_rate and rent information leakage
+total_name = colnames(original_data)
+valid_name = setdiff(total_name,c("CS_PropertyID","leasing_rate","Rent","Energystar","LEED"))
+# green_rating must be included in the features.
+x_name_total = setdiff(valid_name,c("revenue_per_square"))
+y_name = c("revenue_per_square")
+```
+Our data has 7894 observations, and each one of them is a commercial rental property. After removing useless columns, we have 18 features and one prediction target($rental\_income\_per\_square\_foot$). 
+
+In conclusion, $X$ is a matrix of $7894\times 18$, $Y$ is a vector of $7894\times 1$. Our goal is to build a model on $X \sim Y$ with the lowest cross-validation rmse.
+
+The definitions of \textcolor{blue}{18 features} are listed below:
+
+1 cluster: an identifier for the building cluster, with each cluster containing one green-certified building and at least one other non-green-certified building within a quarter-mile radius of the cluster center.
+
+2 size: the total square footage of available rental space in the building.
+
+3 empl.gr: the year-on-year growth rate in employment in the building's geographic region.
+
+4 stories: the height of the building in stories.
+
+5 age: the age of the building in years.
+
+6 renovated: whether the building has undergone substantial renovations during its lifetime.
+
+7,8 class.a class.b: indicators for two classes of building quality (the third is Class C). These are relative classifications within a specific market. Class A buildings are generally the highest-quality properties in a given market. Class B buildings are a notch down, but still of reasonable quality. Class C buildings are the least desirable properties in a given market. 
+
+9 green.rating: an indicator for whether the building is either LEED- or EnergyStar-certified.
+
+10 net: an indicator as to whether the rent is quoted on a "net contract" basis. Tenants with net-rental contracts pay their own utility costs, which are otherwise included in the quoted rental price.
+
+11 amenities: an indicator of whether at least one of the following amenities is available on-site: bank, convenience store, dry cleaner, restaurant, retail shops, fitness center.
+
+12 cd.total.07: number of cooling degree days in the building's region in 2007. A degree day is a measure of demand for energy; higher values mean greater demand. Cooling degree days are measured relative to a baseline outdoor temperature, below which a building needs no cooling.
+
+13 hd.total07: number of heating degree days in the building's region in 2007. Heating degree days are also measured relative to a baseline outdoor temperature, above which a building needs no heating.
+
+14 total.dd.07: the total number of degree days (either heating or cooling) in the building's region in 2007.
+
+15 Precipitation: annual precipitation in inches in the building's geographic region.
+
+16 Gas.Costs: a measure of how much natural gas costs in the building's geographic region.
+
+17 Electricity.Costs: a measure of how much electricity costs in the building's geographic region.
+
+18 City_Market_Rent: a measure of average rent per square-foot per calendar year in the building's local market.
+
+The definition of \textcolor{blue}{prediction target} ($rental\_income\_per\_square\_foot$):
+$$
+rental\_income\_per\_square\_foot=leasing\_rate\times Rent
+$$
+
+\newpage
+\subsubsection{Model}
+
+Xgboost is adopted to fit the data, as tree model can capture nonlinear relationship. The process of modeling can be summarized as follows:
+
+(1) Fit on the whole data set to get feature importance ranks.
+
+(2) Use top $k$ features($k\in[1,18]$) unioned with $green\_rating$ as input features. Then, we use grid-search to find the best parameters with the lowest cross-validation rmse. For instance, the top 3 features unioned with $green\_rating$ is
+$$City\_Market\_Rent,size,age+green\_rating$$
+(3) Finally, we find $k_{best}$ features and best model parameters. We can use this model to quantify the average change in rental income per square foot (whether in absolute or percentage terms) associated with green certification, holding other features of the building constant. 
+ 
+\newpage
+\subsection{Results of Data Analysis}
+
+\subsubsection{Feature Importance}
+
+The 18 features are ranked in the following picture. We can see that $City\_Market\_Rent$ is the most important feature in predicting revenue per square. $green\_rating$ ranks 15 among the 18 features, not very significant.
+
+```{r fig1,echo=FALSE,message=FALSE,fig.width=5.5,fig.height=5.5,fig.align = "center"}
+### Feature Importance:
+X = as.matrix(original_data[c(x_name_total)])
+Y = as.matrix(original_data[y_name])
+dtrain = xgb.DMatrix(X, label = Y)
+bst = xgb.train(data = dtrain, verbose = FALSE,nrounds = 50, nthread = 2,
+                max_depth = 7 , eta = 0.5, objective = "reg:squarederror")
+importance_matrix = xgb.importance(model = bst)
+xgb.plot.importance(importance_matrix = importance_matrix,main="Feature Importance Barplot")
+```
+
+\newpage
+\subsubsection{Best Features and Parameters}
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+## Function for evaluation:
+evaluate_xgb=function(original_data,x_name,y_name){
+rmse_result = Inf
+dep_result = NA
+et_result = NA
+X = as.matrix(original_data[x_name])
+Y = as.matrix(original_data[y_name])
+dtrain = xgb.DMatrix(X, label = Y)
+for (dep in c(3,5,7,9,11)){
+  for(et in c(0.1,0.25,0.5)){
+    set.seed(100)
+    cv = xgb.cv(data = dtrain, verbose = FALSE,nrounds = 50, nthread = 2, nfold = 5, metrics = list("rmse"),
+                max_depth = dep , eta = et, objective = "reg:squarederror")
+    evaluation_matrix = cv[["evaluation_log"]]
+    test_rmse_mean = as.numeric(evaluation_matrix[dim(evaluation_matrix)[1],"test_rmse_mean"])
+    if (test_rmse_mean<rmse_result){
+      rmse_result = test_rmse_mean
+      dep_result = dep
+      et_result = et
+    }
+  }
+}
+return(c(paste(x_name, collapse = '+'),dep_result,et_result,rmse_result))
+}
+
+# result_collect = c()
+# for (i in 1:dim(importance_matrix)[1]){
+#   tem_features = importance_matrix$Feature[1:i]
+#   tem_features = union(tem_features,c("green_rating"))
+#   result = evaluate_xgb(original_data,tem_features,y_name)
+#   result_collect = rbind(result_collect,result)
+#   print(i)
+# }
+# result_collect = data.frame(result_collect)
+# colnames(result_collect) = c("features","max_depth","eta(learning rate)","cv-rmse")
+# result_collect$features = paste("top",1:dim(result_collect)[1],"features")
+# write.csv(result_collect,"data/result_collect.csv")
+
+#  Find the best model max_depth=9,eta=0.25
+i = 11
+tem_features = importance_matrix$Feature[1:i]
+tem_features = union(tem_features,c("green_rating"))
+X = as.matrix(original_data[tem_features])
+Y = as.matrix(original_data[y_name])
+dtrain = xgb.DMatrix(X, label = Y)
+model = xgb.train(data = dtrain, verbose = FALSE,nrounds = 50, nthread = 2,
+            max_depth = 9 , eta = 0.25, objective = "reg:squarederror")
+prediction = predict(model, dtrain)
+```
+
+We use top $k$ features($k\in[1,18]$) unioned with $green\_rating$ as input features. Then, we use grid-search to find the best parameters with the lowest cross-validation rmse. For instance, the top 3 features unioned with $green\_rating$ is
+$$City\_Market\_Rent,size,age+green\_rating$$
+
+The cv-rmses of top $k$ features($k\in[1,18]$) unioned with $green\_rating$ are listed in table \ref{table:1}. Top 11 features unioned with $green\_rating$ is the best combination, with cv-rmse of 7.3272304. Corresponding $max \_depth=9,eta=0.25$
+
+\begin{table}[!htbp]
+\caption{Different Features and Parameters}
+\footnotesize
+\begin{center}
+\begin{tabular}{cccc}
+\hline
+features        & max\_depth & eta(learning rate) & cv-rmse    \\ \hline
+top 1 features  & 3          & 0.1                & 10.9966248 \\
+top 2 features  & 9          & 0.5                & 7.8924662  \\
+top 3 features  & 9          & 0.25               & 7.5659126  \\
+top 4 features  & 11         & 0.25               & 7.4700874  \\
+top 5 features  & 11         & 0.25               & 7.5681676  \\
+top 6 features  & 9          & 0.25               & 7.5822794  \\
+top 7 features  & 9          & 0.25               & 7.4596536  \\
+top 8 features  & 11         & 0.1                & 7.5252744  \\
+top 9 features  & 9          & 0.25               & 7.509116   \\
+top 10 features & 9          & 0.25               & 7.4896898  \\
+\textcolor{blue}{top 11 features} & \textcolor{blue}{9}          & \textcolor{blue}{0.25}               & \textcolor{blue}{7.3272304}  \\
+top 12 features & 9          & 0.25               & 7.3872686  \\
+top 13 features & 11         & 0.1                & 7.4139402  \\
+top 14 features & 9          & 0.25               & 7.3809     \\
+top 15 features & 9          & 0.25               & 7.3809     \\
+top 16 features & 11         & 0.25               & 7.4054108  \\
+top 17 features & 11         & 0.25               & 7.3746844  \\
+top 18 features & 11         & 0.1                & 7.3900858  \\ \hline
+\end{tabular}
+\end{center}
+\label{table:1}
+\end{table}
+
+The best feature combination is:
+$$
+City\_Market\_Rent+size+age+stories+cluster+class\_a+empl\_gr+hd\_total07+cd\_total\_07
+$$
+$$
++class\_b+amenities+green\_rating
+$$
+
+\newpage
+\subsubsection{Effect of Green Certification}
+
+After getting the best features and model-parameters, we fit on the \textbf{WHOLE} data set. The fitting rmse is 2.484052.
+
+The we use the fitted model to predict an artifical example, this example is listed in table \ref{table:2}.
+\begin{table}[!htbp]
+\caption{An Artifical Example}
+\footnotesize
+\begin{center}
+\begin{tabular}{cc}
+\hline
+Variable name      & sample\_data \\ \hline
+City\_Market\_Rent & 27.49728465  \\
+size               & 234637.7435  \\
+age                & 47           \\
+stories            & 13           \\
+cluster            & 403          \\
+class\_a           & 1            \\
+empl\_gr           & 3.206719949  \\
+hd\_total07        & 3432.042311  \\
+cd\_total\_07      & 1229.354193  \\
+class\_b           & 1            \\
+amenities          & 1            \\
+green\_rating      & \textcolor{red}{1/0}            \\ \hline
+\end{tabular}
+\end{center}
+\label{table:2}
+\end{table}
+
+The prediction is as follows. In this artificial example, the green certification house s' revenue per square foot per year is $27.75311-27.16981=0.5833$ higher than the house without green certification.
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+# Find the effect of Green_rating:
+sample_data = colMeans(original_data[tem_features], na.rm = TRUE)
+sample_data = t(data.frame(sample_data))
+sample_data = data.frame(sample_data)
+sample_data$age = 47
+sample_data$stories = 13
+sample_data$cluster  = 403
+sample_data$class_a  = 1
+sample_data$class_b  = 0
+sample_data$amenities  = 1
+sample_data$green_rating  = 1
+print("prediction for green_rating==1")
+predict(model,xgb.DMatrix(as.matrix(sample_data)))
+print("prediction for green_rating==0")
+sample_data$green_rating  = 0
+predict(model,xgb.DMatrix(as.matrix(sample_data)))
+```
+
+We do see Green Certification has a positive effect on the house revenue.
+
+\newpage
+\subsection{Conclusions}
+
+\textbf{Conclusion 1:} $green\_rating$ is NOT an important feature in determining revenue per square foot per year. 
+
+\textbf{Conclusion 2:} $green\_rating$ has a positive effect on revenue per square foot per year based on our artificial example. However, after we set $City\_Market\_Rent=34$, the effect reverses.
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+# Find the effect of Green_rating:
+sample_data = colMeans(original_data[tem_features], na.rm = TRUE)
+sample_data = t(data.frame(sample_data))
+sample_data = data.frame(sample_data)
+sample_data$City_Market_Rent = 34
+sample_data$age = 10
+sample_data$stories = 12
+sample_data$cluster  = 403
+sample_data$class_a  = 0
+sample_data$class_b  = 0
+sample_data$amenities  = 0
+sample_data$green_rating  = 1
+print("prediction for green_rating==1")
+predict(model,xgb.DMatrix(as.matrix(sample_data)))
+print("prediction for green_rating==0")
+sample_data$green_rating  = 0
+predict(model,xgb.DMatrix(as.matrix(sample_data)))
+```
+Note the fact that $City\_Market\_Rent$ is the most important feature, the effect of $green\_rating$ relies heavily on other features.
+
 
 
 

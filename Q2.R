@@ -4,6 +4,7 @@
 library(ggplot2)
 library(xgboost)
 library(tidyverse)
+library(ModelMetrics)
 original_data = read.csv("data/greenbuildings.csv")
 original_data$revenue_per_square = (original_data$leasing_rate/100)*original_data$Rent
 # Your goal is to build the best predictive model possible for revenue per square 
@@ -56,13 +57,48 @@ for (dep in c(3,5,7,9,11)){
 return(c(paste(x_name, collapse = '+'),dep_result,et_result,rmse_result))
 }
 
-result_collect = c()
-for (i in 1:dim(importance_matrix)[1]){
-  tem_features = importance_matrix$Feature[1:i]
-  tem_features = union(tem_features,c("green_rating"))
-  result = evaluate_xgb(original_data,tem_features,y_name)
-  result_collect = rbind(result_collect,result)
-  print(i)
-}
-result_collect = data.frame(result_collect)
-colnames(result_collect) = c("features","max_depth","eta(learning rate)","cv-rmse")
+# result_collect = c()
+# for (i in 1:dim(importance_matrix)[1]){
+#   tem_features = importance_matrix$Feature[1:i]
+#   tem_features = union(tem_features,c("green_rating"))
+#   result = evaluate_xgb(original_data,tem_features,y_name)
+#   result_collect = rbind(result_collect,result)
+#   print(i)
+# }
+# result_collect = data.frame(result_collect)
+# colnames(result_collect) = c("features","max_depth","eta(learning rate)","cv-rmse")
+# result_collect$features = paste("top",1:dim(result_collect)[1],"features")
+# write.csv(result_collect,"data/result_collect.csv")
+
+#  Find the best model max_depth=9,eta=0.25
+i = 11
+tem_features = importance_matrix$Feature[1:i]
+tem_features = union(tem_features,c("green_rating"))
+X = as.matrix(original_data[tem_features])
+Y = as.matrix(original_data[y_name])
+dtrain = xgb.DMatrix(X, label = Y)
+model = xgb.train(data = dtrain, verbose = FALSE,nrounds = 50, nthread = 2,
+            max_depth = 9 , eta = 0.25, objective = "reg:squarederror")
+prediction = predict(model, dtrain)
+rmse(Y,prediction)
+
+
+# Find the effect of Green_rating:
+sample_data = colMeans(original_data[tem_features], na.rm = TRUE)
+sample_data = t(data.frame(sample_data))
+sample_data = data.frame(sample_data)
+sample_data$age = 47
+sample_data$stories = 13
+sample_data$cluster  = 403
+sample_data$class_a  = 1
+sample_data$class_b  = 1
+sample_data$amenities  = 1
+sample_data$green_rating  = 1
+write.csv(t(sample_data),"data/sample_data.csv")
+print("prediction for green_rating==1")
+predict(model,xgb.DMatrix(as.matrix(sample_data)))
+print("prediction for green_rating==0")
+sample_data$green_rating  = 0
+predict(model,xgb.DMatrix(as.matrix(sample_data)))
+
+
