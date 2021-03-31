@@ -5,12 +5,14 @@ thanks: "Mingwei Li, Xinyu Leng and Hongjin Long are master students of economic
 output:
   pdf_document: 
     number_sections: yes
+    includes:
+      in_header: preamble.tex
   html_document: default
 ---
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-
 \begin{abstract}
 This document is the third homework of ECO395M STAT LEARNING. 
 \begin{figure}[!htbp]
@@ -123,9 +125,9 @@ some two crimes per day, or more than 12 percent.
 
 \subsection{Overview of the Problem}
 
-With the increasing concentration on environmental protection, green certification for buildings become more and more important. The buildings with green certification are able to charge more rent as they can save energy cost and bring reputation to the tenant. However, the benefit of green certification needs to be quantified to provide more guidance for house owners. It's very difficult to extract the effect of green certification on revenue per square foot per calendar year, as there are many factors which can affect leasing rate and rent. 
+With the increasing concentration on environmental protection, green certification for buildings become more and more important. The buildings with green certification are able to charge more rent as they can save energy cost and bring reputation to the tenant. However, the benefit of green certification needs to be quantified to provide more guidance for house owners. It's very difficult to extract the effect of green certification on revenue per square foot per calendar year, as there are many factors which can affect leasing rate and rent.
 
-In this part, we (1) build a predictive model for revenue per square foot per calendar year based on 7894 commercial rental properties from across the United States, (2) and  use this model to quantify the average change in rental income per square foot associated with green certification, holding other features of the building constant. 
+In this part, we (1) build a predictive model for revenue per square foot per calendar year based on 7894 commercial rental properties from across the United States, (2) and  use this model to quantify the average change in rental income per square foot associated with green certification, holding other features of the building constant.
 
 $$
 rental\_income\_per\_square\_foot=leasing\_rate\times Rent
@@ -143,12 +145,12 @@ library(tidyverse)
 library(ModelMetrics)
 original_data = read.csv("data/greenbuildings.csv")
 original_data$revenue_per_square = (original_data$leasing_rate/100)*original_data$Rent
-# Your goal is to build the best predictive model possible for revenue per square 
-# foot per calendar year, and to use this model to quantify the average change in 
-# rental income per square foot (whether in absolute or percentage terms) associated 
-# with green certification, holding other features of the building constant. 
+# Your goal is to build the best predictive model possible for revenue per square
+# foot per calendar year, and to use this model to quantify the average change in
+# rental income per square foot (whether in absolute or percentage terms) associated
+# with green certification, holding other features of the building constant.
 # We have 2 goals
-# (1) build the best predictive model possible for revenue per square 
+# (1) build the best predictive model possible for revenue per square
 # foot per calendar year
 
 # Remove features not nacessary
@@ -159,7 +161,7 @@ valid_name = setdiff(total_name,c("CS_PropertyID","leasing_rate","Rent","Energys
 x_name_total = setdiff(valid_name,c("revenue_per_square"))
 y_name = c("revenue_per_square")
 ```
-Our data has 7894 observations, and each one of them is a commercial rental property. After removing useless columns, we have 18 features and one prediction target($rental\_income\_per\_square\_foot$). 
+Our data has 7894 observations, and each one of them is a commercial rental property. After removing useless columns, we have 18 features and one prediction target($rental\_income\_per\_square\_foot$).
 
 In conclusion, $X$ is a matrix of $7894\times 18$, $Y$ is a vector of $7894\times 1$. Our goal is to build a model on $X \sim Y$ with the lowest cross-validation rmse.
 
@@ -177,7 +179,7 @@ The definitions of \textcolor{blue}{18 features} are listed below:
 
 6 renovated: whether the building has undergone substantial renovations during its lifetime.
 
-7,8 class.a class.b: indicators for two classes of building quality (the third is Class C). These are relative classifications within a specific market. Class A buildings are generally the highest-quality properties in a given market. Class B buildings are a notch down, but still of reasonable quality. Class C buildings are the least desirable properties in a given market. 
+7,8 class.a class.b: indicators for two classes of building quality (the third is Class C). These are relative classifications within a specific market. Class A buildings are generally the highest-quality properties in a given market. Class B buildings are a notch down, but still of reasonable quality. Class C buildings are the least desirable properties in a given market.
 
 9 green.rating: an indicator for whether the building is either LEED- or EnergyStar-certified.
 
@@ -213,8 +215,8 @@ Xgboost is adopted to fit the data, as tree model can capture nonlinear relation
 
 (2) Use top $k$ features($k\in[1,18]$) unioned with $green\_rating$ as input features. Then, we use grid-search to find the best parameters with the lowest cross-validation rmse. For instance, the top 3 features unioned with $green\_rating$ is
 $$City\_Market\_Rent,size,age+green\_rating$$
-(3) Finally, we find $k_{best}$ features and best model parameters. We can use this model to quantify the average change in rental income per square foot (whether in absolute or percentage terms) associated with green certification, holding other features of the building constant. 
- 
+(3) Finally, we find $k_{best}$ features and best model parameters. We can use this model to quantify the average change in rental income per square foot (whether in absolute or percentage terms) associated with green certification, holding other features of the building constant.
+
 \newpage
 \subsection{Results of Data Analysis}
 
@@ -384,7 +386,7 @@ We do see Green Certification has a positive effect on the house revenue.
 \newpage
 \subsection{Conclusions}
 
-\textbf{Conclusion 1:} $green\_rating$ is NOT an important feature in determining revenue per square foot per year. 
+\textbf{Conclusion 1:} $green\_rating$ is NOT an important feature in determining revenue per square foot per year.
 
 \textbf{Conclusion 2:} $green\_rating$ has a positive effect on revenue per square foot per year based on our artificial example. However, after we set $City\_Market\_Rent=34$, the effect reverses.
 ```{r,echo=FALSE,message=FALSE,warning=FALSE}
@@ -408,6 +410,253 @@ predict(model,xgb.DMatrix(as.matrix(sample_data)))
 ```
 Note the fact that $City\_Market\_Rent$ is the most important feature, the effect of $green\_rating$ relies heavily on other features.
 
+\newpage
+\section{Predictive model building: California housing}
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+## Load packages and data
+library(ggplot2)
+library(tidyverse)
+library(ggmap)
+library(leaps)
+library(xgboost)
+library(scales)
+library(ModelMetrics)
+housing = read.csv("data/CAhousing.csv", stringsAsFactors=TRUE)
+housing$mean_rooms = housing$totalRooms/housing$households
+housing$mean_bedrooms = housing$totalBedrooms/housing$households
+
+#Get x_name_total and y_name
+total_name = colnames(housing)
+x_name_total = setdiff(total_name,c("medianHouseValue"))
+y_name = c("medianHouseValue")
+```
+\subsection{Build the Best Predictive Model for MedianHouseValue}
+
+\textbf{Your task is to build the best predictive model you can for medianHouseValue, using the other available features. Write a short report detailing your methods. Make sure your report includes an estimate for the overall out-of-sample accuracy of your proposed model.}
+
+As Tree model can capture nonlinear relationship. We adopt xgboost to model the build the predictive model for medianHouseValue. The feature-importance figure is as follows:
+```{r fig2,echo=FALSE,message=FALSE,fig.width=5.5,fig.height=5.5,fig.align = "center"}
+#Feature Importance:
+X = as.matrix(housing[c(x_name_total)])
+Y = as.matrix(housing[y_name])
+dtrain = xgb.DMatrix(X, label = Y)
+bst = xgb.train(data = dtrain, verbose = FALSE,nrounds = 50, nthread = 2,
+                max_depth = 7 , eta = 0.5, objective = "reg:squarederror")
+importance_matrix = xgb.importance(model = bst)
+xgb.plot.importance(importance_matrix = importance_matrix,main="Feature Importance Barplot")
+```
+
+\newpage
+The performance of different feature combinations is listed in the table \ref{table:3}.
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+#Function for evaluation:
+evaluate_xgb=function(original_data,x_name,y_name){
+  rmse_result = Inf
+  dep_result = NA
+  et_result = NA
+  X = as.matrix(original_data[x_name])
+  Y = as.matrix(original_data[y_name])
+  dtrain = xgb.DMatrix(X, label = Y)
+  for (dep in c(3,5,7,9,11)){
+    for(et in c(0.25)){
+      set.seed(100)
+      cv = xgb.cv(data = dtrain, verbose = FALSE,nrounds = 50, nthread = 2, nfold = 5, metrics = list("rmse"),
+                  max_depth = dep , eta = et, objective = "reg:squarederror")
+      evaluation_matrix = cv[["evaluation_log"]]
+      test_rmse_mean = as.numeric(evaluation_matrix[dim(evaluation_matrix)[1],"test_rmse_mean"])
+      if (test_rmse_mean<rmse_result){
+        rmse_result = test_rmse_mean
+        dep_result = dep
+        et_result = et
+      }
+    }
+  }
+  return(c(paste(x_name, collapse = '+'),dep_result,et_result,rmse_result))
+}
+
+# result_collect = c()
+# for (i in 1:dim(importance_matrix)[1]){
+#   tem_features = importance_matrix$Feature[1:i]
+#   result = evaluate_xgb(housing,tem_features,y_name)
+#   result_collect = rbind(result_collect,result)
+#   print(i)
+# }
+# result_collect = data.frame(result_collect)
+# colnames(result_collect) = c("features","max_depth","eta(learning rate)","cv-rmse")
+# result_collect$features = paste("top",1:dim(result_collect)[1],"features")
+# write.csv(result_collect,"data/result_collect.csv")
+```
+\begin{table}[!htbp]
+\caption{An Artifical Example}
+\footnotesize
+\begin{center}
+\begin{tabular}{cccc}
+\hline
+features        & max\_depth & eta(learning rate) & cv-rmse     \\ \hline
+top 1 features  & 3          & 0.25               & 82655.34844 \\
+top 2 features  & 5          & 0.25               & 69552.60156 \\
+\textcolor{blue}{top 3 features}  & \textcolor{blue}{11}         & \textcolor{blue}{0.25}               & \textcolor{blue}{47500.57578} \\
+top 4 features  & 9          & 0.25               & 48271.325   \\
+top 5 features  & 9          & 0.25               & 47906.44141 \\
+top 6 features  & 9          & 0.25               & 48124.78359 \\
+top 7 features  & 7          & 0.25               & 49340.41016 \\
+top 8 features  & 7          & 0.25               & 48800.51328 \\
+top 9 features  & 7          & 0.25               & 48629.82578 \\
+top 10 features & 7          & 0.25               & 48478.21328 \\ \hline
+\end{tabular}
+\end{center}
+\label{table:3}
+\end{table}
+
+Top 3 features $medianHouseValue,longitude,latitude$, with $max\_depth=11$, have the best out-of-sample performance($cv\_rmse=47500.57578$).
+
+Then, we use the best feature combination and best parameters to fit on the whole data set. The fitting rmse is 23846.53.
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+i = 3
+tem_features = importance_matrix$Feature[1:i]
+X = as.matrix(housing[tem_features])
+Y = as.matrix(housing[y_name])
+dtrain = xgb.DMatrix(X, label = Y)
+model = xgb.train(data = dtrain, verbose = FALSE,nrounds = 50, nthread = 2,
+                  max_depth = 11 , eta = 0.25, objective = "reg:squarederror")
+prediction = predict(model, dtrain)
+print(rmse(Y,prediction))
+```
+
+\newpage
+\subsection{The Three Figures}
+
+\textbf{Also include three figures:}
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+# The code for plot is annotated to avoid repeated computation.
+
+# califonia <- c(left = -125, bottom = 32, right = -113, top = 42)
+# map <- get_stamenmap(califonia, zoom = 9, maptype = "watercolor")
+# ggmap(map)
+# 
+# # figure 1:a plot of the original data, using a color scale to show medianHouseValue versus longitude (x) and latitude (y).
+# fig1_realmap=qmplot(alpha=0.01,longitude, latitude,color=medianHouseValue,data=housing)+
+#   xlab("Longitude") +
+#   ylab("Latitude") +
+#   ggtitle("Median HouseValue at Different Tracts in California(real map)") +
+#   theme(plot.title = element_text(hjust = 0.5)) +
+#   scale_colour_gradient(low = "yellow", high = "red")+
+#   labs(color = "Median House Value")
+# fig1_realmap
+# 
+# fig1_normal = ggplot(housing)+
+#   geom_point(alpha = 0.05,aes(x = longitude, y = latitude, color = medianHouseValue))+
+#   xlab("Longitude") +
+#   ylab("Latitude") +
+#   ggtitle("Median HouseValue at Different Tracts in California") +
+#   theme(plot.title = element_text(hjust = 0.5)) +
+#   scale_colour_gradient(low = "yellow", high = "red")+
+#   labs(color = "Median House Value")
+# fig1_normal
+# 
+# 
+# # figure 2:a plot of your model's predictions of medianHouseValue versus longitude (x) and latitude (y).
+# housing$medianHouseValue_prediction = prediction
+# fig2_realmap=qmplot(alpha=0.01,longitude, latitude,color=medianHouseValue_prediction,data=housing)+
+#   xlab("Longitude") +
+#   ylab("Latitude") +
+#   ggtitle("Median HouseValue Prediction at Different Tracts in California(real map)") +
+#   theme(plot.title = element_text(hjust = 0.5)) +
+#   scale_colour_gradient(low = "yellow", high = "red")+
+#   labs(color = "Median House Value Prediction")
+# fig2_realmap
+# 
+# fig2_normal = ggplot(housing)+
+#   geom_point(alpha = 0.05,aes(x = longitude, y = latitude, color = medianHouseValue_prediction))+
+#   xlab("Longitude") +
+#   ylab("Latitude") +
+#   ggtitle("Median HouseValue Prediction at Different Tracts in California") +
+#   theme(plot.title = element_text(hjust = 0.5)) +
+#   scale_colour_gradient(low = "yellow", high = "red")+
+#   labs(color = "Median House Value Prediction")
+# fig2_normal
+# 
+# # figure 3:a plot of your model's errors/residuals versus longitude (x) and latitude (y)
+# housing$error = abs(Y-prediction)
+# fig3_realmap=qmplot(alpha=0.0001,longitude, latitude,color=error,data=housing)+
+#   xlab("Longitude") +
+#   ylab("Latitude") +
+#   ggtitle("Prediction Error at Different Tracts in California(real map)") +
+#   theme(plot.title = element_text(hjust = 0.5)) +
+#   scale_colour_gradient(low = "yellow", high = "red")+
+#   labs(color = "Prediction Error")
+# fig3_realmap
+# 
+# fig3_normal = ggplot(housing)+
+#   geom_point(alpha = 0.05,aes(x = longitude, y = latitude, color = error))+
+#   xlab("Longitude") +
+#   ylab("Latitude") +
+#   ggtitle("Prediction Error at Different Tracts in California") +
+#   theme(plot.title = element_text(hjust = 0.5)) +
+#   scale_colour_gradient(low = "yellow", high = "red")+
+#   labs(color = "Prediction Error")
+# fig3_normal
+```
+
+\textbf{(Q3\_2\_1):a plot of the original data, using a color scale to show medianHouseValue (or log medianHouseValue) versus longitude (x) and latitude (y).}
+
+From figure \ref{fig:3_1}, we can see a lot of red points on the coastline, which means house price is higher in areas near sea.
+
+\begin{figure}[!htbp]
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=10cm, height=12cm]{pics/fig1_normal.png}
+  \caption{Median HouseValue at Different Tracts in California}
+\end{subfigure}
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=10cm, height=12cm]{pics/fig1_realmap.png}
+  \caption{Median HouseValue at Different Tracts in California(real map)}
+\end{subfigure}
+\caption{A Plot of the Original Data}
+\label{fig:3_1}
+\end{figure}
+
+\newpage
+\textbf{(Q3\_2\_2):a plot of your model's predictions of medianHouseValue (or log medianHouseValue) versus longitude (x) and latitude (y).}
+
+Figure \ref{fig:3_2} is similar to figure \ref{fig:3_1}, which means our model fits very well. Cross-validation rmse is 47500.57578, not too far from fitting error of 23846.53 $\Rightarrow$ our model is robust.
+
+\begin{figure}[!htbp]
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=10cm, height=12cm]{pics/fig2_normal.png}
+  \caption{Median HouseValue Prediction at Different Tracts in California}
+\end{subfigure}
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=10cm, height=12cm]{pics/fig2_realmap.png}
+  \caption{Median HouseValue Prediction at Different Tracts in California(real map)}
+\end{subfigure}
+\caption{A Plot of my Model's Predictions}
+\label{fig:3_2}
+\end{figure}
+
+
+\newpage
+\textbf{(Q3\_2\_3):a plot of your model's errors/residuals (or log residuals) versus longitude (x) and latitude (y).}
+
+Figure \ref{fig:3_3} is mainly consisted of yellow points, which means our model fits well across different tracts(absolute residuals are low). Note we've taken absolute value of those residuals to represent prediction errors.
+
+\begin{figure}[!htbp]
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=10cm, height=12cm]{pics/fig3_normal.png}
+  \caption{Prediction Errors at Different Tracts in California}
+\end{subfigure}
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=10cm, height=12cm]{pics/fig3_realmap.png}
+  \caption{Prediction Errors at Different Tracts in California(real map)}
+\end{subfigure}
+\caption{A Plot of my Model's Errors/Residuals}
+\label{fig:3_3}
+\end{figure}
 
 
 

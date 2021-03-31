@@ -1,104 +1,145 @@
 # \section{Problem 3:Predictive model building: California housing}
 ## Load packages and data
-install.packages("ggmap")
-install.packages("leaps")
 library(ggplot2)
 library(tidyverse)
 library(ggmap)
 library(leaps)
+library(xgboost)
 library(scales)
-CAhousing <- read.csv("data/CAhousing.csv", stringsAsFactors=TRUE)
-summary(CAhousing)
+library(ModelMetrics)
+housing = read.csv("data/CAhousing.csv", stringsAsFactors=TRUE)
+housing$mean_rooms = housing$totalRooms/housing$households
+housing$mean_bedrooms = housing$totalBedrooms/housing$households
 
+#Get x_name_total and y_name
+total_name = colnames(housing)
+x_name_total = setdiff(total_name,c("medianHouseValue"))
+y_name = c("medianHouseValue")
 
-# sampling
-set.seed(1234)
-train <- sample(nrow(CAhousing),0.7*nrow(CAhousing))
-CAhousingtrain <- CAhousing[train,]
-CAhousingtest <- CAhousing[-train,]
+#Feature Importance:
+X = as.matrix(housing[c(x_name_total)])
+Y = as.matrix(housing[y_name])
+dtrain = xgb.DMatrix(X, label = Y)
+bst = xgb.train(data = dtrain, verbose = FALSE,nrounds = 50, nthread = 2,
+                max_depth = 7 , eta = 0.5, objective = "reg:squarederror")
+importance_matrix = xgb.importance(model = bst)
+xgb.plot.importance(importance_matrix = importance_matrix)
 
-# Q1 build the best predictive model for medianHouseValue
-# model selection
-### 因为逐步回归法没办法评测到每一个模型，所以在这里使用全子集回归
-### 这里我用了一种比较简洁的方法，如果跟兄弟的最佳模型有区别，我可以根据兄弟的模型修改后面的绘图代码
-# using all-subsets regression to choose the best model
+#Function for evaluation:
+evaluate_xgb=function(original_data,x_name,y_name){
+  rmse_result = Inf
+  dep_result = NA
+  et_result = NA
+  X = as.matrix(original_data[x_name])
+  Y = as.matrix(original_data[y_name])
+  dtrain = xgb.DMatrix(X, label = Y)
+  for (dep in c(3,5,7,9,11)){
+    for(et in c(0.25)){
+      set.seed(100)
+      cv = xgb.cv(data = dtrain, verbose = FALSE,nrounds = 50, nthread = 2, nfold = 5, metrics = list("rmse"),
+                  max_depth = dep , eta = et, objective = "reg:squarederror")
+      evaluation_matrix = cv[["evaluation_log"]]
+      test_rmse_mean = as.numeric(evaluation_matrix[dim(evaluation_matrix)[1],"test_rmse_mean"])
+      if (test_rmse_mean<rmse_result){
+        rmse_result = test_rmse_mean
+        dep_result = dep
+        et_result = et
+      }
+    }
+  }
+  return(c(paste(x_name, collapse = '+'),dep_result,et_result,rmse_result))
+}
 
-leaps <-regsubsets( medianHouseValue ~  longitude + latitude +	housingMedianAge + totalRooms + totalBedrooms + population + households + medianIncome, data=CAhousingtrain, nbest=8)
-plot(leaps, scale="adjr2")
-# As we can see in the plots, the model with all 8 variables has the best R^2, which is equal to 0.65. So the best predictive model is longitude + latitude +	housingMedianAge + totalRooms + totalBedrooms + population + households + medianIncome
+result_collect = c()
+for (i in 1:dim(importance_matrix)[1]){
+  tem_features = importance_matrix$Feature[1:i]
+  result = evaluate_xgb(housing,tem_features,y_name)
+  result_collect = rbind(result_collect,result)
+  print(i)
+}
+result_collect = data.frame(result_collect)
+colnames(result_collect) = c("features","max_depth","eta(learning rate)","cv-rmse")
+result_collect$features = paste("top",1:dim(result_collect)[1],"features")
+write.csv(result_collect,"data/result_collect.csv")
+# top 3 features have the lowest cv-rmse
 
-# final model
-fit <- lm( medianHouseValue ~  longitude + latitude +	housingMedianAge + totalRooms + totalBedrooms + population + households + medianIncome, data=CAhousingtrain)
+#  Find the best model top 3 features max_depth=11,eta=0.25 cv-rmse=47500.57578
+i = 3
+tem_features = importance_matrix$Feature[1:i]
+X = as.matrix(housing[tem_features])
+Y = as.matrix(housing[y_name])
+dtrain = xgb.DMatrix(X, label = Y)
+model = xgb.train(data = dtrain, verbose = FALSE,nrounds = 50, nthread = 2,
+                  max_depth = 11 , eta = 0.25, objective = "reg:squarederror")
+prediction = predict(model, dtrain)
+rmse(Y,prediction)
 
-summary(fit)
-coef(fit)
-coef(fit) %>% round (3)
-
-# predict the model
-test_actual = CAhousingtest$medianHouseValue
-test_predictions = predict(fit, CAhousingtest)
-
-# get maps
+#################################################################
+# Start plotting
+#################################################################
 califonia <- c(left = -125, bottom = 32, right = -113, top = 42)
 map <- get_stamenmap(califonia, zoom = 9, maptype = "watercolor")
 ggmap(map)
 
 # figure 1:a plot of the original data, using a color scale to show medianHouseValue versus longitude (x) and latitude (y).
-head(CAhousing[c('longitude','latitude','medianHouseValue')])
-### figure1第一种展现形式是将population作为size大小的变量，可能更好看一些。                                                                                               data=data0[data0$Category %in% Top3,],alpha=1)+labs(x='Longitude',y='Latitude')
-plot_map11 = ggmap(map, base_layer = ggplot(CAhousing, 
-          aes(x = longitude, y = latitude, color = medianHouseValue 
-          ))) +
-  geom_point(aes(size = population), alpha = 0.4) +
+fig1_realmap=qmplot(alpha=0.01,longitude, latitude,color=medianHouseValue,data=housing)+
   xlab("Longitude") +
   ylab("Latitude") +
-  ggtitle("medianHouseValue versus longitude and latitude(original data)") +
+  ggtitle("Median HouseValue at Different Tracts in California(real map)") +
   theme(plot.title = element_text(hjust = 0.5)) +
-  scale_color_distiller(palette = "Paired",labels=comma) +
-  labs(color = "Median House Value", size = "Population")
-
-plot_map11
-
-# figure1第二种展现形式是按照题目要求只有median house value 和经纬度，比较直观。
-plot_map12 = ggmap(map, base_layer = ggplot(CAhousing, 
-             aes(x = longitude, y = latitude, color = medianHouseValue 
-              ))) +
-  geom_point(alpha = 0.4) +
-  xlab("Longitude") +
-  ylab("Latitude") +
-  ggtitle("medianHouseValue versus longitude and latitude(original data)") +
-  theme(plot.title = element_text(hjust = 0.5)) +
-  scale_color_distiller(palette = "Paired",labels=comma) +
+  scale_colour_gradient(low = "yellow", high = "red")+
   labs(color = "Median House Value")
+fig1_realmap
 
-plot_map12
+fig1_normal = ggplot(housing)+
+  geom_point(alpha = 0.05,aes(x = longitude, y = latitude, color = medianHouseValue))+
+  xlab("Longitude") +
+  ylab("Latitude") +
+  ggtitle("Median HouseValue at Different Tracts in California") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_colour_gradient(low = "yellow", high = "red")+
+  labs(color = "Median House Value")
+fig1_normal
 
-### figure1 兄弟可以二选一
 
 # figure 2:a plot of your model's predictions of medianHouseValue versus longitude (x) and latitude (y).
-plot_map2 = ggmap(map, base_layer = ggplot(CAhousingtest, 
-            aes(x = longitude, y = latitude, color = test_predictions))) +
-  geom_point(alpha = 0.4) +
+housing$medianHouseValue_prediction = prediction
+fig2_realmap=qmplot(alpha=0.01,longitude, latitude,color=medianHouseValue_prediction,data=housing)+
   xlab("Longitude") +
   ylab("Latitude") +
-  ggtitle("medianHouseValue versus longitude and latitude(prediction)") +
+  ggtitle("Median HouseValue Prediction at Different Tracts in California(real map)") +
   theme(plot.title = element_text(hjust = 0.5)) +
-  scale_color_distiller(palette = "Paired",labels=comma) +
-  labs(color = "test_prediction")
+  scale_colour_gradient(low = "yellow", high = "red")+
+  labs(color = "Median House Value Prediction")
+fig2_realmap
 
-plot_map2
+fig2_normal = ggplot(housing)+
+  geom_point(alpha = 0.05,aes(x = longitude, y = latitude, color = medianHouseValue_prediction))+
+  xlab("Longitude") +
+  ylab("Latitude") +
+  ggtitle("Median HouseValue Prediction at Different Tracts in California") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_colour_gradient(low = "yellow", high = "red")+
+  labs(color = "Median House Value Prediction")
+fig2_normal
 
 # figure 3:a plot of your model's errors/residuals versus longitude (x) and latitude (y)
-
-
-plot_map3 = ggmap(map, base_layer = ggplot(CAhousingtest, 
-            aes(x = longitude, y = latitude, color = test_predictions - test_actual ))) +
-  geom_point(aes(size = abs(test_predictions - test_actual)),alpha = 0.4) +
+housing$error = abs(Y-prediction)
+fig3_realmap=qmplot(alpha=0.0001,longitude, latitude,color=error,data=housing)+
   xlab("Longitude") +
   ylab("Latitude") +
-  ggtitle("residuals versus longitude and latitude") +
+  ggtitle("Prediction Error at Different Tracts in California(real map)") +
   theme(plot.title = element_text(hjust = 0.5)) +
-  scale_color_distiller(palette = "Paired",labels=comma) +
-  labs(color = "residuals", size = "Magnitude of Price Difference")
+  scale_colour_gradient(low = "yellow", high = "red")+
+  labs(color = "Prediction Error")
+fig3_realmap
 
-plot_map3
+fig3_normal = ggplot(housing)+
+  geom_point(alpha = 0.05,aes(x = longitude, y = latitude, color = error))+
+  xlab("Longitude") +
+  ylab("Latitude") +
+  ggtitle("Prediction Error at Different Tracts in California") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_colour_gradient(low = "yellow", high = "red")+
+  labs(color = "Prediction Error")
+fig3_normal

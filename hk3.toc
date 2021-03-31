@@ -9,3 +9,6 @@
 \contentsline {subsubsection}{\numberline {2.3.2}Best Features and Parameters}{9}{subsubsection.2.3.2}%
 \contentsline {subsubsection}{\numberline {2.3.3}Effect of Green Certification}{10}{subsubsection.2.3.3}%
 \contentsline {subsection}{\numberline {2.4}Conclusions}{11}{subsection.2.4}%
+\contentsline {section}{\numberline {3}Predictive model building: California housing}{12}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Build the Best Predictive Model for MedianHouseValue}{12}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}The Three Figures}{14}{subsection.3.2}%
